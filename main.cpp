@@ -30,11 +30,6 @@ inline float clamp(float x, float min, float max) {
     return x;
 }
 
-Color interpolate(float lambda, Color color_1, Color color_2) {
-    lambda = clamp(lambda, 0, 1);
-    return (1 - lambda) * color_1 + lambda * color_2;
-}
-
 float uniform() {
     // Will be used to obtain a seed for the random number engine
     static std::random_device rd;
@@ -64,22 +59,34 @@ Color traceRay(const swRay &r, swScene scene, int depth) {
     swVec3 lightDir = gLightPos - hp.mPosition;
     lightDir.normalize();
 
-    // Part 3 - Shadows
-    if(scene.intersect(hp.getShadowRay(lightDir), si)) c = Color(0, 0, 0);
-    // Part 2 - Diffuse shading
-    else c = hp.mMaterial.mColor * (hp.mNormal * lightDir);
+    // Task 1 - Diffuse shading
+    if(!scene.intersect(hp.getShadowRay(lightDir), si)) {
+        c = hp.mMaterial.mColor * (hp.mNormal * lightDir);
+    }
+    // Task 2 - Shadows
+    else {
+        c = Color(0, 0, 0);
+    }
 
-    // Part 4 - Reflection
-    float reflectivity = hp.mMaterial.reflectivity;
-    if(depth > 0 && reflectivity > 0) {
-        c = interpolate(reflectivity, c, traceRay(hp.getReflectedRay(), scene, depth - 1));
+    float reflectivity = clamp(hp.mMaterial.reflectivity, 0.0f, 1.0f);
+    float transparency = clamp(hp.mMaterial.transparency, 0.0f, 1.0f);
+    if(depth > 0) {
+        c = clamp((1.0f - reflectivity - transparency), 0.0f, 1.0f) * c;
+        // Task 3 - Reflection
+        if(reflectivity > 0){
+            c += reflectivity * traceRay(hp.getReflectedRay(), scene, depth - 1);
+        }
+        // Task 5 - Refraction
+        if(transparency > 0){
+            c += transparency * traceRay(hp.getRefractedRay(), scene, depth - 1);
+        }
     }
 
     return c;
 }
 
 int main() {
-    int imageWidth = 512;
+    int imageWidth = 1028;
     int imageHeight = imageWidth;
     const int numChannels = 3;
     uint8_t *pixels = new uint8_t[imageWidth * imageHeight * numChannels];
@@ -109,17 +116,34 @@ int main() {
     camera.setup(imageWidth, imageHeight);
 
     // Ray Trace pixels
-    int depth = 5;
+    int depth = 20;
+    int subSampling = 3;
+    float ss = static_cast<float>(subSampling);
+    float d = 0.5f / ss;
+    
     std::cout << "Rendering\n";
     for (int j = 0; j < imageHeight; ++j) {
         for (int i = 0; i < imageWidth; ++i) {
             Color pixel;
             // trace pixel
-            float cx = ((float)i) + 0.5f;
-            float cy = ((float)j) + 0.5f;
+            for (int x = 0; x < subSampling; x++) {
+                for (int y = 0; y < subSampling; y++) {
+                    float rx = uniform() - 0.5f;
+                    float ry = uniform() - 0.5f;
 
-            swRay r = camera.getRay(cx, cy);
-            pixel = traceRay(r, scene, depth);
+                    float cx = ((float)i) 
+                        + ((float)x) * d
+                        + rx * d;
+                    float cy = ((float)j) 
+                        + ((float)y) * d
+                        + ry * d;
+
+                    swRay r = camera.getRay(cx, cy);
+                    pixel += traceRay(r, scene, depth);
+                }
+            }
+
+            pixel = pixel * (1 / powf(subSampling, 2));
 
             WriteColor((j * imageWidth + i) * numChannels, pixel, pixels);
         }
