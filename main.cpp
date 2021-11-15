@@ -59,7 +59,8 @@ Color traceRay(const swRay &r, swScene scene, int depth) {
     swVec3 lightDir = gLightPos - hp.mPosition;
     lightDir.normalize();
 
-    c = Color(1, 1, 1);
+    // PART 2 - DIFFUSE SHADING
+    c = hp.mMaterial.mColor * (hp.mNormal * lightDir);
 
     return c;
 }
