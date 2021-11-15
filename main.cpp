@@ -30,6 +30,11 @@ inline float clamp(float x, float min, float max) {
     return x;
 }
 
+Color interpolate(float lambda, Color color_1, Color color_2) {
+    lambda = clamp(lambda, 0, 1);
+    return (1 - lambda) * color_1 + lambda * color_2;
+}
+
 float uniform() {
     // Will be used to obtain a seed for the random number engine
     static std::random_device rd;
@@ -59,8 +64,16 @@ Color traceRay(const swRay &r, swScene scene, int depth) {
     swVec3 lightDir = gLightPos - hp.mPosition;
     lightDir.normalize();
 
-    // PART 2 - DIFFUSE SHADING
-    c = hp.mMaterial.mColor * (hp.mNormal * lightDir);
+    // Part 3 - Shadows
+    if(scene.intersect(hp.getShadowRay(lightDir), si)) c = Color(0, 0, 0);
+    // Part 2 - Diffuse shading
+    else c = hp.mMaterial.mColor * (hp.mNormal * lightDir);
+
+    // Part 4 - Reflection
+    float reflectivity = hp.mMaterial.reflectivity;
+    if(depth > 0 && reflectivity > 0) {
+        c = interpolate(reflectivity, c, traceRay(hp.getReflectedRay(), scene, depth - 1));
+    }
 
     return c;
 }
@@ -96,7 +109,7 @@ int main() {
     camera.setup(imageWidth, imageHeight);
 
     // Ray Trace pixels
-    int depth = 3;
+    int depth = 5;
     std::cout << "Rendering\n";
     for (int j = 0; j < imageHeight; ++j) {
         for (int i = 0; i < imageWidth; ++i) {

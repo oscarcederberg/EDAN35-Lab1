@@ -6,12 +6,10 @@ swRay swIntersection::getShadowRay(const swVec3 &L) {
 
 swRay swIntersection::getReflectedRay(void) {
     swVec3 N = mNormal;
-    const swVec3 D = mRay.dir;
+    const swVec3 V = -mRay.dir;
 
-    // TODO: Implement reflection.
-    // -------------------
-    swVec3 R = D;
-    // -------------------
+    swVec3 R = 2 * (N * V) * N - V;
+    
     swRay rray = swRay(mPosition, R, 0.0f, 0.01f, FLT_MAX);
     return rray;
 }
